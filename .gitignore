@@ -1,0 +1,28 @@
+# Arquivos de Bytecode do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos de Banco de Dados
+*.sqlite3
+db.sqlite3
+
+# Ambiente Virtual
+.venv/
+venv/
+ENV/
+
+# Arquivos de configuração de IDEs
+.idea/
+.vscode/
+
+# Arquivo de variáveis de ambiente
+.env
+
+# Arquivos de log e de sistema
+*.log
+.DS_Store
+
+# Arquivos estáticos coletados pelo Django
+/static_root/
+/media_root/

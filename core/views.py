@@ -1,188 +1,75 @@
-from django.shortcuts import render
+# Arquivo: core/views.py
 
-# Create your views here.
 from django.shortcuts import render
 from django.db.models import Count
-from .models import Consulta, Ambulatorio, Convenio, Consulta
-from django.http import HttpResponse
-from django.views import View
-from .utils import GeraPDFMixin
-import plotly.graph_objs as go
+from .models import Paciente, Medico, Consulta, Convenio
+import plotly.express as px
+import json
 
-def relatorio_consultas(request):
-    consultas = Consulta.objects.select_related('medico', 'paciente', 'convenio').order_by('-data')
-    return render(request, 'relatorios/relatorio_consultas.html', {'consultas': consultas})
-
-def relatorio_pacientes_por_ambulatorio(request):
-    dados = (
-        Ambulatorio.objects
-        .annotate(total_pacientes=Count('paciente'))
-        .order_by('-total_pacientes')
-    )
-    return render(request, 'relatorios/relatorio_pacientes_ambulatorio.html', {'dados': dados})
-
-
-def relatorio_medicos_por_convenio(request):
-    dados = (
-        Convenio.objects
-        .annotate(total_medicos=Count('medico'))
-        .order_by('-total_medicos')
-    )
-    return render(request, 'relatorios/relatorio_medicos_convenio.html', {'dados': dados})
-
-
-def grafico_pacientes_por_ambulatorio(request):
-    dados = (
-        Ambulatorio.objects
-        .annotate(total_pacientes=Count('paciente'))
-        .order_by('nome')
-    )
-
-    labels = [amb.nome for amb in dados]
-    valores = [amb.total_pacientes for amb in dados]
-
-    return render(request, 'graficos/grafico_pacientes_ambulatorio.html', {
-        'labels': labels,
-        'valores': valores
-    })
-
-
-def grafico_medicos_por_convenio(request):
-    dados = (
-        Convenio.objects
-        .annotate(total_medicos=Count('medico'))
-        .filter(total_medicos__gt=0)
-        .order_by('nome')
-    )
-
-    labels = [conv.nome for conv in dados]
-    valores = [conv.total_medicos for conv in dados]
-
-    return render(request, 'graficos/grafico_medicos_convenio.html', {
-        'labels': labels,
-        'valores': valores
-    })
-
-
-def grafico_consultas_por_dia(request):
-    dados = (
-        Consulta.objects
-        .values('data')
-        .annotate(total=Count('id'))
-        .order_by('data')
-    )
-
-    datas = [str(item['data']) for item in dados]
-    totais = [item['total'] for item in dados]
-
-    trace = go.Bar(x=datas, y=totais, marker=dict(color='rgba(255,99,132,0.6)'))
-    layout = go.Layout(title='Consultas por Dia', xaxis=dict(title='Data'), yaxis=dict(title='Quantidade'))
-    fig = go.Figure(data=[trace], layout=layout)
-    grafico_html = fig.to_html(full_html=False)
-
-    return render(request, 'graficos/grafico_consultas_plotly.html', {'grafico': grafico_html})
-
-
-
-
+# --- PÁGINA PRINCIPAL / DASHBOARD ---
 def dashboard(request):
-    # Gráfico 1: Pacientes por ambulatório
-    ambulatorios = (
-        Ambulatorio.objects
-        .annotate(total_pacientes=Count('paciente'))
-        .order_by('nome')
+    # Gráfico 1: Consultas por dia (usando Plotly)
+    consultas_por_dia = Consulta.objects.values('data').annotate(total=Count('id')).order_by('data')
+    fig_consultas = px.line(
+        x=[item['data'] for item in consultas_por_dia],
+        y=[item['total'] for item in consultas_por_dia],
+        labels={'x': 'Data', 'y': 'Número de Consultas'},
+        title='Volume de Consultas por Dia',
+        markers=True
     )
-    labels_amb = [amb.nome for amb in ambulatorios]
-    valores_amb = [amb.total_pacientes for amb in ambulatorios]
+    fig_consultas.update_layout(title_x=0.5)
+    grafico_consultas_html = fig_consultas.to_html(full_html=False)
 
-    # Gráfico 2: Médicos por convênio
-    convenios = (
-        Convenio.objects
-        .annotate(total_medicos=Count('medico'))
-        .filter(total_medicos__gt=0)
-        .order_by('nome')
-    )
-    labels_conv = [c.nome for c in convenios]
-    valores_conv = [c.total_medicos for c in convenios]
+    # Gráfico 2: Pacientes por ambulatório (para Chart.js)
+    pacientes_por_ambulatorio = Paciente.objects.values('ambulatorio__nome').annotate(total=Count('id')).order_by('-total')
+    labels_pac_amb = [item['ambulatorio__nome'] for item in pacientes_por_ambulatorio]
+    data_pac_amb = [item['total'] for item in pacientes_por_ambulatorio]
 
-    # Gráfico 3: Consultas por dia (Plotly)
-    consultas = (
-        Consulta.objects
-        .values('data')
-        .annotate(total=Count('id'))
-        .order_by('data')
-    )
-    datas = [str(item['data']) for item in consultas]
-    totais = [item['total'] for item in consultas]
-    plotly_trace = go.Bar(x=datas, y=totais, marker=dict(color='rgba(255,99,132,0.6)'))
-    plotly_layout = go.Layout(title='Consultas por Dia', xaxis=dict(title='Data'), yaxis=dict(title='Quantidade'))
-    plotly_fig = go.Figure(data=[plotly_trace], layout=plotly_layout)
-    plotly_html = plotly_fig.to_html(full_html=False)
+    # Gráfico 3: Médicos por especialidade (para Chart.js - tipo "Doughnut")
+    medicos_por_especialidade = Medico.objects.values('especialidade').annotate(total=Count('crm')).order_by('-total')
+    labels_med_esp = [item['especialidade'] for item in medicos_por_especialidade]
+    data_med_esp = [item['total'] for item in medicos_por_especialidade]
 
-    return render(request, 'dashboard.html', {
-        'labels_amb': labels_amb,
-        'valores_amb': valores_amb,
-        'labels_conv': labels_conv,
-        'valores_conv': valores_conv,
-        'plotly_html': plotly_html,
-    })
+    context = {
+        'grafico_consultas_html': grafico_consultas_html,
+        'labels_pac_amb': json.dumps(labels_pac_amb),
+        'data_pac_amb': json.dumps(data_pac_amb),
+        'labels_med_esp': json.dumps(labels_med_esp),
+        'data_med_esp': json.dumps(data_med_esp),
+    }
+    return render(request, 'dashboard.html', context)
 
 
+# --- RELATÓRIOS ---
+def relatorio_pacientes_por_cidade(request):
+    dados = Paciente.objects.values('cidade').annotate(total=Count('id')).order_by('-total')
+    context = {
+        'titulo': 'Relatório de Pacientes por Cidade',
+        'dados': dados,
+        'colunas': ['Cidade', 'Total de Pacientes'],
+        'tipo': 'paciente_cidade'
+    }
+    return render(request, 'relatorio_geral.html', context)
 
 
-class RelatorioConsultasPDF(View, GeraPDFMixin):
-    def get(self, request):
-        consultas = Consulta.objects.select_related('medico', 'paciente', 'convenio').order_by('-data')
-        contexto = {'consultas': consultas}
-        return self.criar_pdf('relatorios/relatorio_consultas.html', contexto)
+def relatorio_consultas_por_medico(request):
+    dados = Medico.objects.annotate(total_consultas=Count('consultas')).order_by('-total_consultas')
+    context = {
+        'titulo': 'Relatório de Consultas por Médico',
+        'dados': dados,
+        'colunas': ['Médico', 'Especialidade', 'Total de Consultas'],
+        'tipo': 'medico'
+    }
+    return render(request, 'relatorio_geral.html', context)
 
 
-class RelatorioPacientesAmbulatorioPDF(View, GeraPDFMixin):
-    def get(self, request):
-        dados = (
-            Ambulatorio.objects
-            .annotate(total_pacientes=Count('paciente'))
-            .order_by('nome')
-        )
-        contexto = {'dados': dados}
-        return self.criar_pdf('relatorios/relatorio_pacientes_ambulatorio.html', contexto)
-
-
-class RelatorioMedicosConvenioPDF(View, GeraPDFMixin):
-    def get(self, request):
-        dados = (
-            Convenio.objects
-            .annotate(total_medicos=Count('medico'))
-            .filter(total_medicos__gt=0)
-            .order_by('nome')
-        )
-        contexto = {'dados': dados}
-        return self.criar_pdf('relatorios/relatorio_medicos_convenio.html', contexto)
-
-
-
-class DashboardPDFView(View, GeraPDFMixin):
-    def get(self, request):
-        ambulatorios = (
-            Ambulatorio.objects
-            .annotate(total_pacientes=Count('paciente'))
-            .order_by('nome')
-        )
-        convenios = (
-            Convenio.objects
-            .annotate(total_medicos=Count('medico'))
-            .filter(total_medicos__gt=0)
-            .order_by('nome')
-        )
-        consultas = (
-            Consulta.objects
-            .values('data')
-            .annotate(total=Count('id'))
-            .order_by('data')
-        )
-        contexto = {
-            'ambulatorios': ambulatorios,
-            'convenios': convenios,
-            'consultas': consultas,
-        }
-        return self.criar_pdf('dashboard_pdf.html', contexto)
+def relatorio_convenios_utilizados(request):
+    # O seu banco de dados 'convenio' não tem a coluna 'plano', então ela foi removida da busca.
+    dados = Consulta.objects.values('convenio__nome').annotate(total=Count('id')).order_by('-total')
+    context = {
+        'titulo': 'Relatório de Utilização de Convênios',
+        'dados': dados,
+        'colunas': ['Convênio', 'Nº de Vezes Utilizado'],
+        'tipo': 'convenio'
+    }
+    return render(request, 'relatorio_geral.html', context)

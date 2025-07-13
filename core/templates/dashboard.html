@@ -1,100 +1,80 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <title>Dashboard da Clínica</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link
-  rel="stylesheet"
-  href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
->
-</head>
-<body style="margin: 20px; padding: 20px;">
-    <br/>
-    <h1 style="text-align: center">Dashboard da Clínica do Luis!!!!!!</h1>
-    <br/>
-    <section>
-        <h2>1. Pacientes por Ambulatório</h2>
-        <p>Este gráfico de <strong>barras</strong> é muito top e mostra a quantidade de pacientes
-            alocados por ambulatório, utilizando a biblioteca Chart.js, que é uma biblioteca daora</p>
-        <br/>
-        <div style="display: flex; justify-content: center;">
-        <canvas id="graficoAmbulatorio" style="max-width: 500px; max-height: 350px;"></canvas>
-        </div>
-    </section>
-    <br/>
-    <a href="{% url 'pdf_pacientes_ambulatorio' %}" target="_blank">
-    <button>📄 Gerar PDF - Pacientes por Ambulatório</button>
-    </a>
-    <br/><br/>
-    <section>
-        <br/>
-        <h2>2. Médicos por Convênio</h2>
-        <p>Gráfico do tipo <strong>pizza</strong> (não é de comer) para dar uma olhada na distribuição de
-            médicos entre os convênios. A biblioteca usada também foi a Chart.js.</p>
-        <br/>
-        <div style="display: flex; justify-content: center;">
-        <canvas id="graficoConvenio" style="max-width: 400px; max-height: 400px;"></canvas>
-        </div>
-    </section>
-    <br/>
-    <a href="{% url 'pdf_medicos_convenio' %}" target="_blank">
-    <button>📄 Gerar PDF - Médicos por Convênio</button>
-    </a>
-    <br/>
-    <section>
-        <br/>
-        <h2>3. Consultas por Dia</h2>
-        <p>Gráfico interativo que achei bem bonito gerado com a biblioteca <strong>Plotly</strong>,
-            que mostra o total de consultas realizadas por dia.</p>
-        <br/>
-        {{ plotly_html|safe }}
-    </section>
-    <br/>
-    <a href="{% url 'pdf_consultas' %}" target="_blank">
-    <button>📄 Gerar PDF - Consultas</button>
-    </a>
-    <br/><br/>
-    <section style="background-color: black; margin: 10px; padding: 10px; border-radius: 30px;">
-        <br/>
-        <p style="text-align: center;">Preguiça de clicar de relatório em relatório? acesse o relatório geral, que junta eles
-        para você não perder tempo e já dar a nota máxima 👍👍👍👍👍</p>
-    <div style="text-align: center; margin-top: 30px;">
-        <a href="{% url 'dashboard_pdf' %}" target="_blank">
-            <button style="padding: 10px 20px; font-size: 16px;">📄 Gerar Relatório PDF</button>
-        </a>
+{% extends 'base.html' %}
 
+{% block title %}Dashboard Gerencial{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Volume de Consultas por Dia (Plotly)</h5>
+            </div>
+            <div class="card-body">
+                {{ grafico_consultas_html|safe }}
+            </div>
+        </div>
     </div>
-        <br/>
-    </section>
-    <script>
-        new Chart(document.getElementById('graficoAmbulatorio'), {
-            type: 'bar',
-            data: {
-                labels: {{ labels_amb|safe }},
-                datasets: [{
-                    label: 'Total de Pacientes',
-                    data: {{ valores_amb|safe }},
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)'
-                }]
-            },
-            options: {
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
-        });
+</div>
 
-        new Chart(document.getElementById('graficoConvenio'), {
-            type: 'pie',
-            data: {
-                labels: {{ labels_conv|safe }},
-                datasets: [{
-                    label: 'Médicos por Convênio',
-                    data: {{ valores_conv|safe }},
-                    backgroundColor: ['#ff6384', '#36a2eb', '#cc65fe', '#ffce56', '#2ecc71']
-                }]
-            }
-        });
-    </script>
-</body>
-</html>
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Pacientes por Ambulatório (Chart.js - Barras)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="graficoPacientesAmbulatorio"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Distribuição de Médicos por Especialidade (Chart.js - Rosca)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="graficoMedicosEspecialidade"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Gráfico de Pacientes por Ambulatório
+const ctxPacAmb = document.getElementById('graficoPacientesAmbulatorio');
+new Chart(ctxPacAmb, {
+    type: 'bar',
+    data: {
+        labels: {{ labels_pac_amb|safe }},
+        datasets: [{
+            label: 'Nº de Pacientes',
+            data: {{ data_pac_amb|safe }},
+            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: { scales: { y: { beginAtZero: true } } }
+});
+
+// Gráfico de Médicos por Especialidade
+const ctxMedEsp = document.getElementById('graficoMedicosEspecialidade');
+new Chart(ctxMedEsp, {
+    type: 'doughnut',
+    data: {
+        labels: {{ labels_med_esp|safe }},
+        datasets: [{
+            label: 'Nº de Médicos',
+            data: {{ data_med_esp|safe }},
+            backgroundColor: [
+                'rgba(255, 99, 132, 0.5)',
+                'rgba(54, 162, 235, 0.5)',
+                'rgba(255, 206, 86, 0.5)',
+                'rgba(75, 192, 192, 0.5)',
+                'rgba(153, 102, 255, 0.5)',
+            ],
+        }]
+    }
+});
+</script>
+{% endblock %}

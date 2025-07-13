@@ -1,48 +1,43 @@
-from django.contrib import admin
+# Arquivo: core/admin.py
 
-# Register your models here.
 from django.contrib import admin
-from .models import Ambulatorio, Medico, Paciente, Convenio, Consulta, Atende, Possui
-
+from .models import Ambulatorio, Convenio, Consulta, Medico, Paciente
 
 @admin.register(Ambulatorio)
 class AmbulatorioAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'numleitos', 'andar')
+    list_display = ('nome', 'andar', 'numleitos')
     search_fields = ('nome',)
-
-
-@admin.register(Medico)
-class MedicoAdmin(admin.ModelAdmin):
-    list_display = ('crm', 'nome', 'especialidade', 'idade', 'salario', 'ambulatorio')
-    list_filter = ('especialidade', 'ambulatorio')
-    search_fields = ('nome', 'crm')
-
-
-@admin.register(Paciente)
-class PacienteAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'idade', 'cidade', 'ambulatorio')
-    search_fields = ('nome', 'cidade')
-    list_filter = ('ambulatorio',)
-
+    list_filter = ('andar',)
 
 @admin.register(Convenio)
 class ConvenioAdmin(admin.ModelAdmin):
     list_display = ('codconv', 'nome')
     search_fields = ('nome',)
 
-
 @admin.register(Consulta)
 class ConsultaAdmin(admin.ModelAdmin):
-    list_display = ('data', 'horario', 'medico', 'paciente', 'convenio', 'porcent')
-    list_filter = ('data', 'medico', 'convenio')
+    list_display = ('data', 'horario', 'medico', 'paciente', 'convenio')
+    search_fields = ('medico__nome', 'paciente__nome', 'convenio__nome')
+    list_filter = ('data', 'convenio__nome')
+    autocomplete_fields = ('medico', 'paciente', 'convenio')
+    date_hierarchy = 'data'
 
+@admin.register(Medico)
+class MedicoAdmin(admin.ModelAdmin):
+    list_display = ('nome', 'crm', 'especialidade', 'ambulatorio', 'salario_formatado')
+    search_fields = ('nome', 'crm', 'especialidade')
+    list_filter = ('especialidade', 'ambulatorio__nome')
+    autocomplete_fields = ('ambulatorio',)
 
-@admin.register(Atende)
-class AtendeAdmin(admin.ModelAdmin):
-    list_display = ('medico', 'convenio')
+    @admin.display(description='Salário')
+    def salario_formatado(self, obj):
+        if obj.salario:
+            return f"R$ {obj.salario:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return "Não informado"
 
-
-@admin.register(Possui)
-class PossuiAdmin(admin.ModelAdmin):
-    list_display = ('paciente', 'convenio', 'tipo', 'vencimento')
-    list_filter = ('tipo',)
+@admin.register(Paciente)
+class PacienteAdmin(admin.ModelAdmin):
+    list_display = ('nome', 'cidade', 'idade', 'ambulatorio')
+    search_fields = ('nome', 'cidade')
+    list_filter = ('cidade', 'ambulatorio__nome')
+    autocomplete_fields = ('ambulatorio',)
